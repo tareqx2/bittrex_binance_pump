@@ -1,0 +1,23 @@
+{
+  "name": "pumpbot",
+  "version": "1.0.0",
+  "description": "auto-buy a coin with some config settings",
+  "main": "pumpBot.js",
+  "dependencies": {
+    "lodash": "^4.17.4",
+    "minimist": "^1.2.0",
+    "terminal-kit": "^1.14.3",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {
+    "node.bittrex.api": "^1.0.0",
+    "node-binance-api": "^0.3.8",
+    "cryptocompare": "^0.4.0",
+    "winston": "^3.0.0-rc0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT"
+}
