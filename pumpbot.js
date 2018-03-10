@@ -175,7 +175,7 @@ function sellBinance(asset, quantity) {
   api.binance.marketSell(asset, quantity, flags, function(responseSell) {
 
     var avgPrice = findAveragePrice(responseSell);
-    var totalProfit = convertToPercentage(avgPrice, tFill);
+    var totalProfit = convertToPercentage(tFill, avgPrice);
 
     term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${responseSell.executedQty} shares of ${responseSell.symbol} at `).brightGreen(`B${avgPrice}\n`);
 
