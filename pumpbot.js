@@ -23,6 +23,8 @@ var term = require( 'terminal-kit' ).terminal;
 var buyOrderPoll;
 var tQty; // global variable for the quantity filled for an order
 var tFill; //global variable for lastPrice taken from binance websocket
+var fixedQty;
+var realQty;
 
 /**********************************
 * INITIALIZATION
@@ -115,31 +117,23 @@ function buyBinance(info) {
   let coin = info.coin.toUpperCase()+"BTC";
 
   shares = convertToCorrectLotSize(shares,info.binanceFormatInfo);
+  fixedQty = info.binanceFormatInfo;
   console.log('');
   term.brightYellow(`BINANCE: `).defaultColor(`Attempting to buy ${shares} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
-  api.binance.marketBuy(coin, shares, flags, function(responseBuy) {
+  api.binance.marketBuy(coin, shares, flags, function(response) {
 
-    var avgPrice = findAveragePrice(responseBuy);
+    var avgPrice = findAveragePrice(response);
+    let orderID = response.orderId;
+    realQty = findRealQty(response);
 
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${responseBuy.executedQty} shares of ${responseBuy.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
-
-    tQty = responseBuy.executedQty;
-    let orderID = responseBuy.orderId;
+    term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
 
     //checkOrderStatus(coin, orderID);
     pollProfitAndLoss(coin, avgPrice);
   });
 }
-
-/*
-function checkOrderStatus(asset, id) {
-  api.binance.orderStatus(asset, id, function(responseStatus) {
-    console.log(responseStatus);
-  });
-}
-*/
 
 function pollProfitAndLoss(asset, fillPrice) {
 
@@ -165,19 +159,21 @@ function pollProfitAndLoss(asset, fillPrice) {
     } else if (key.ctrl && key.name === 's') {
       inLoop = 0;
       console.log('\nCtrl + S Detected, Selling...\n');
-      sellBinance(asset, tQty);
+      sellBinance(asset, realQty);
     }
   });
 }
 
 function sellBinance(asset, quantity) {
+  quantity = convertToCorrectLotSize(quantity,fixedQty);
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
-  api.binance.marketSell(asset, quantity, flags, function(responseSell) {
+  api.binance.marketSell(asset, quantity, flags, function(response) {
 
-    var avgPrice = findAveragePrice(responseSell);
-    var totalProfit = convertToPercentage(tFill, avgPrice);
+    var avgSell = findAveragePrice(response);
+    var totalProfit = convertToPercentage(tFill, avgSell);
+    var sellQty = findRealQty(response);
 
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${responseSell.executedQty} shares of ${responseSell.symbol} at `).brightGreen(`B${avgPrice}\n`);
+    term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${sellQty} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
 
     if(totalProfit.indexOf("-") > -1) {
       term(`You are now down `).brightRed(`${totalProfit} %`);
@@ -189,8 +185,23 @@ function sellBinance(asset, quantity) {
   });
 }
 
-function sellBinancePart(asset, percent) {
+function findRealQty(array) {
+  var sum1 = 0;
+  var sum2 = 0;
 
+  for(var i = 0; i < array.fills.length; i++) {
+      sum1 += array.fills[i].commission;
+      sum2 += array.fills[i].qty;
+  }
+  var x = sum1 / array.fills.length;
+  var y = sum2 / array.fills.length;
+
+  if (array.fills[0].commissionAsset == 'BNB') {
+    return y;
+  }
+  else {
+    return y - x;
+  }
 }
 
 function findAveragePrice(array) {
@@ -213,6 +224,7 @@ function convertToCorrectLotSize(shares, requirement) {
     let stringArray = requirement.stepSize.split('.');
     if(stringArray.length > 1) {
       let trimSize = stringArray[1].replace(new RegExp('0', 'g'),'').length;
+      console.log(trimSize);
       shares = shares.toFixed(trimSize);
     }
   }
