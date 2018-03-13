@@ -123,10 +123,13 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
-
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
+
+    if(realQty < info.binanceFormatInfo.minQty) {
+      console.log('your order is less than the minimum quantity needed to make a purchase');
+    }
 
     term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
 
@@ -198,8 +201,9 @@ function findRealQty(array) {
 
   if (array.fills[0].commissionAsset == 'BNB') {
     return y;
-  }
-  else {
+  } else if (array.fills[0].commissionAsset == 'BTC') {
+    return y;
+  } else {
     return y - x;
   }
 }
@@ -207,7 +211,7 @@ function findRealQty(array) {
 function findAveragePrice(array) {
   var sum = 0;
   for(var i = 0; i < array.fills.length; i++) {
-      sum += array.fills[i].price;
+    sum += array.fills[i].price;
   }
   return sum / array.fills.length;
 }
@@ -220,12 +224,12 @@ function convertToPercentage(initial, next) {
 }
 
 function convertToCorrectLotSize(shares, requirement) {
+  let step_size;
+  let order_size;
   if(requirement && requirement.stepSize) {
-    let stringArray = requirement.stepSize.split('.');
-    if(stringArray.length > 1) {
-      let trimSize = stringArray[1].replace(new RegExp('0', 'g'),'').length;
-      console.log(trimSize);
-      shares = shares.toFixed(trimSize);
+    step_size = parseFloat(requirement.stepSize);
+    if (shares % step_size != 0) {
+      shares = parseInt(shares / step_size) * step_size;
     }
   }
   return shares;
