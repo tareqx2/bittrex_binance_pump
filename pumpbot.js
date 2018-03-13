@@ -94,7 +94,7 @@ function buyBittrex(info) {
             } else if(data.result.CancelInitiated) {
               console.log(`order cancel was initiated by user`);
             } else {
-              console.log(`ORDER FILLED at Ƀ${displaySats(data.result.PricePerUnit)}!`);
+              console.log(`ORDER FILLED at Ƀ${data.result.PricePerUnit}!`);
               clearInterval(buyOrderPoll);
             }
           }
@@ -107,6 +107,7 @@ function buyBittrex(info) {
 function buyBinance(info) {
   let price = info.binancePrice + (info.binancePrice * mainConfig.market_buy_inflation);
   let shares = binanceConfig.investment / price;
+  console.log(`calculated shares ${shares}`);
   shares = convertToCorrectLotSize(shares,info.binanceFormatInfo);
   console.log(`buying ${shares} of ${info.coin} on binance`);
   api.binance.marketBuy(info.coin.toUpperCase()+"BTC", shares, function(response) {
@@ -123,14 +124,25 @@ function checkOrderStatus(orderUUID) {
 }
 
 function convertToCorrectLotSize(shares, requirement) {
+  let step_size;
+  let order_size;
+  //console.log(`shares ${shares}`);
   if(requirement && requirement.stepSize) {
-    let stringArray = requirement.stepSize.split('.');
-    if(stringArray.length > 1) {
-      let trimSize = stringArray[1].replace(new RegExp('0', 'g'),'').length;
-      shares = shares.toFixed(trimSize);
+    step_size = parseFloat(requirement.stepSize);
+    if (shares % step_size != 0) {
+      shares = parseInt(shares / step_size) * step_size;
     }
   }
+
+    //console.log(`orderSize: ${order_size}`);
   return shares;
+  //   let stringArray = requirement.stepSize.split('.');
+  //   if(stringArray.length > 1) {
+  //     let trimSize = stringArray[1].replace(new RegExp('0', 'g'),'').length;
+  //     shares = shares.toFixed(trimSize);
+  //   }
+  // }
+  // return shares;
 }
 
 function exit(message) {
