@@ -75,8 +75,8 @@ function waitForInput() {
         buyBinance(info);
       }
     } else {
-      logger.log('info',`coin was not found on binance/bittrex`);
-      waitForCoinInput();
+      logger.log('info',`\nCoin was not found on Binance or Bittrex`);
+      waitForInput();
     }
   });
 }
@@ -123,6 +123,7 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
+    console.log(response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
