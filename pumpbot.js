@@ -101,7 +101,7 @@ function buyBittrex(info) {
             } else if(data.result.CancelInitiated) {
               console.log(`order cancel was initiated by user`);
             } else {
-              console.log(`ORDER FILLED at Ƀ${data.result.PricePerUnit}!`);
+              console.log(`ORDER FILLED at Ƀ${displaySats(data.result.PricePerUnit)}!`);
               clearInterval(buyOrderPoll);
             }
           }
@@ -232,16 +232,7 @@ function convertToCorrectLotSize(shares, requirement) {
       shares = parseInt(shares / step_size) * step_size;
     }
   }
-
-    //console.log(`orderSize: ${order_size}`);
   return shares;
-  //   let stringArray = requirement.stepSize.split('.');
-  //   if(stringArray.length > 1) {
-  //     let trimSize = stringArray[1].replace(new RegExp('0', 'g'),'').length;
-  //     shares = shares.toFixed(trimSize);
-  //   }
-  // }
-  // return shares;
 }
 
 function exit(message) {
