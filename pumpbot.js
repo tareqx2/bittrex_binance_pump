@@ -123,7 +123,6 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
-    console.log(response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
