@@ -123,7 +123,7 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
-    //console.log(response);
+    console.log(response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
@@ -172,7 +172,7 @@ function sellBinance(asset, quantity) {
   quantity = convertToCorrectLotSize(quantity,fixedQty);
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketSell(asset, quantity, flags, function(response) {
-
+    console.log(response);
     var avgSell = findAveragePrice(response);
     var totalProfit = convertToPercentage(tFill, avgSell);
     var sellQty = findRealQty(response);
@@ -199,15 +199,13 @@ function findRealQty(array) {
     sum1 += num1;
     sum2 += num2;
   }
-  var x = (sum1 / array.fills.length).toFixed(8);
-  var y = (sum2 / array.fills.length).toFixed(8);
-
+  
   if (array.fills[0].commissionAsset == 'BNB') {
-    return y;
+    return sum2;
   } else if (array.fills[0].commissionAsset == 'BTC') {
-    return y;
+    return sum2;
   } else {
-    return y - x;
+    return sum2 - sum1;
   }
 }
 
