@@ -123,6 +123,7 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
+    //console.log(response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
@@ -193,11 +194,13 @@ function findRealQty(array) {
   var sum2 = 0;
 
   for(var i = 0; i < array.fills.length; i++) {
-      sum1 += array.fills[i].commission;
-      sum2 += array.fills[i].qty;
+    var num1 =  Number(array.fills[i].commission);
+    var num2 =  Number(array.fills[i].qty);
+    sum1 += num1;
+    sum2 += num2;
   }
-  var x = sum1 / array.fills.length;
-  var y = sum2 / array.fills.length;
+  var x = (sum1 / array.fills.length).toFixed(8);
+  var y = (sum2 / array.fills.length).toFixed(8);
 
   if (array.fills[0].commissionAsset == 'BNB') {
     return y;
@@ -211,9 +214,10 @@ function findRealQty(array) {
 function findAveragePrice(array) {
   var sum = 0;
   for(var i = 0; i < array.fills.length; i++) {
-    sum += array.fills[i].price;
+    var x =  Number(array.fills[i].price);
+    sum += x;
   }
-  return sum / array.fills.length;
+  return (sum / array.fills.length).toFixed(8);
 }
 
 function convertToPercentage(initial, next) {
