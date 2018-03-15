@@ -30,6 +30,7 @@ bittrex.options({
 binance.options({
   'APIKEY': binanceConfig.api_key,
   'APISECRET':binanceConfig.api_secret,
+  useServerTime: true,
 });
 
 function preloadCoins() {

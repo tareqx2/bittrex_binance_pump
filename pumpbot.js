@@ -83,25 +83,27 @@ function waitForInput() {
 
 function buyBittrex(info) {
   let price = info.bittrexPrice + (info.bittrexPrice * mainConfig.market_buy_inflation);
-  //console.log(bittrexConfig.investment);
   let shares = bittrexConfig.investment / price;
   let coin = 'BTC-'+info.coin.toUpperCase();
-  term.brightBlue(`BITTREX: `).defaultColor(`Attempting to buy ${shares} shares of ${coin} at `).brightGreen(`B${price.toFixed(8)}`);
+
+  term.brightBlue(`BITTREX: `).defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
+  
   api.bittrex.buylimit({market: coin, quantity: shares, rate: price}, (data,err) => {
     if(err) {
-      logger.log('error', `\nBittrex purchase was unsuccesful: ${err.message}`);
+      term.brightBlue(`BITTREX: `).defaultColor(`Purchase was unsuccesful: `).brightRed(`${err.message}\n`);
     } else {
       buyOrderPoll = setInterval(function() {
         api.bittrex.getorder({uuid: data.result.uuid}, (data,err) => {
+          //console.log(data);
           if(err) {
-            exit(`something went wrong with getOrderBuy: ${err.message}`);
+            term.brightBlue(`BITTREX: `).defaultColor(`Something went wrong with getOrderBuy: ${err.message}\n`);
           } else {
             if(data.result.IsOpen) {
-              console.log(`order not yet filled`);
+              term.brightBlue(`BITTREX: `).defaultColor(`Order not yet filled\n`);
             } else if(data.result.CancelInitiated) {
-              console.log(`order cancel was initiated by user`);
+              term.brightBlue(`BITTREX: `).defaultColor(`Order cancel initiated by user\n`);
             } else {
-              console.log(`ORDER FILLED at Ƀ${data.result.PricePerUnit}!`);
+              term.brightBlue(`BITTREX: `).defaultColor(`Successfully bought ${data.result.Quantity} shares of ${info.coin.toUpperCase()+'BTC'} at `).brightGreen(`B${(data.result.PricePerUnit).toFixed(8)}\n\n`);
               clearInterval(buyOrderPoll);
             }
           }
@@ -120,13 +122,11 @@ function buyBinance(info) {
   fixedQty = info.binanceFormatInfo;
   
   console.log('');
-  logger.log('info', info);
-  term.brightYellow(`BINANCE: `).defaultColor(`Attempting to buy ${shares} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
+  term.brightYellow(`BINANCE: `).defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
     //console.log(response);
-    logger.log('info', response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
@@ -135,7 +135,7 @@ function buyBinance(info) {
       console.log('your order is less than the minimum quantity needed to make a purchase');
     }
 
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
+    term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
 
     //checkOrderStatus(coin, orderID);
     pollProfitAndLoss(coin, avgPrice);
@@ -180,7 +180,7 @@ function sellBinance(asset, quantity) {
     var totalProfit = convertToPercentage(tFill, avgSell);
     var sellQty = findRealQty(response);
 
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${sellQty} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
+    term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${sellQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
 
     if(totalProfit.indexOf("-") > -1) {
       term(`You are now down `).brightRed(`${totalProfit} %`);
