@@ -86,10 +86,10 @@ function buyBittrex(info) {
   //console.log(bittrexConfig.investment);
   let shares = bittrexConfig.investment / price;
   let coin = 'BTC-'+info.coin.toUpperCase();
-  term.brightBlue(`BITTREX: `).defaultColor(`Attempting to buy ${shares} shares of ${info.coin} at `).brightGreen(`B${price}`);
+  term.brightBlue(`BITTREX: `).defaultColor(`Attempting to buy ${shares} shares of ${coin} at `).brightGreen(`B${price.toFixed(8)}`);
   api.bittrex.buylimit({market: coin, quantity: shares, rate: price}, (data,err) => {
     if(err) {
-      logger.log('error', `Bittrex purchase was unsuccesful: ${err.message}`);
+      logger.log('error', `\nBittrex purchase was unsuccesful: ${err.message}`);
     } else {
       buyOrderPoll = setInterval(function() {
         api.bittrex.getorder({uuid: data.result.uuid}, (data,err) => {
@@ -101,7 +101,7 @@ function buyBittrex(info) {
             } else if(data.result.CancelInitiated) {
               console.log(`order cancel was initiated by user`);
             } else {
-              console.log(`ORDER FILLED at Ƀ${displaySats(data.result.PricePerUnit)}!`);
+              console.log(`ORDER FILLED at Ƀ${data.result.PricePerUnit}!`);
               clearInterval(buyOrderPoll);
             }
           }
@@ -118,12 +118,15 @@ function buyBinance(info) {
 
   shares = convertToCorrectLotSize(shares,info.binanceFormatInfo);
   fixedQty = info.binanceFormatInfo;
+  
   console.log('');
+  logger.log('info', info);
   term.brightYellow(`BINANCE: `).defaultColor(`Attempting to buy ${shares} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
     //console.log(response);
+    logger.log('info', response);
     var avgPrice = findAveragePrice(response);
     let orderID = response.orderId;
     realQty = findRealQty(response);
