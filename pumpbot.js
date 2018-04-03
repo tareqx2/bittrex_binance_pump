@@ -21,10 +21,10 @@ var term = require( 'terminal-kit' ).terminal;
 * VARIABLES
 ***********************************/
 var buyOrderPoll;
-var tQty; // global variable for the quantity filled for an order
 var tFill; //global variable for lastPrice taken from binance websocket
 var fixedQty;
 var realQty;
+var avgPrice;
 
 /**********************************
 * INITIALIZATION
@@ -126,24 +126,37 @@ function buyBinance(info) {
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
-    //console.log(response);
-    var avgPrice = findAveragePrice(response);
-    let orderID = response.orderId;
-    realQty = findRealQty(response);
-
-    if(realQty < info.binanceFormatInfo.minQty) {
-      console.log('your order is less than the minimum quantity needed to make a purchase');
+    if(response.code) {
+      console.log("Error Code: " + response.code);
+      console.log(response.msg);
+      rl.question(`\nRetry? y/n: `, (answer) => {
+        if(answer == 'y' || answer == 'Y' ) {
+          buyBinance(info);
+        }
+        else {
+          exit();
+        }
+      });
     }
-
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
-
-    //checkOrderStatus(coin, orderID);
-    pollProfitAndLoss(coin, avgPrice);
+    else {
+      var x = findAveragePrice(response);
+      avgPrice = x.average;
+      realQty = x.quantity;
+      let orderID = response.orderId;
+  
+      if(realQty < info.binanceFormatInfo.minQty) {
+        console.log('Your order is less than the minimum quantity needed to make a purchase');
+      }
+  
+      term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
+  
+      //checkOrderStatus(coin, orderID);
+      pollProfitAndLoss(coin, avgPrice);
+    }
   });
 }
 
 function pollProfitAndLoss(asset, fillPrice) {
-
   api.binance.websockets.chart(asset, "1m", (symbol, interval, chart) => {
     let tick = api.binance.last(chart);
     var last = chart[tick].close;
@@ -175,10 +188,15 @@ function sellBinance(asset, quantity) {
   quantity = convertToCorrectLotSize(quantity,fixedQty);
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketSell(asset, quantity, flags, function(response) {
-    //console.log(response);
-    var avgSell = findAveragePrice(response);
+    if(response.code) {
+      console.log("Error Code: " + response.code);
+      console.log(response.msg);
+    }
+
+    var x = findAveragePrice(response);
+    var avgSell = x.average;
+    var sellQty = x.quantity;
     var totalProfit = convertToPercentage(tFill, avgSell);
-    var sellQty = findRealQty(response);
 
     term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${sellQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
 
@@ -192,33 +210,19 @@ function sellBinance(asset, quantity) {
   });
 }
 
-function findRealQty(array) {
-  var sum1 = 0;
-  var sum2 = 0;
-
-  for(var i = 0; i < array.fills.length; i++) {
-    var num1 =  Number(array.fills[i].commission);
-    var num2 =  Number(array.fills[i].qty);
-    sum1 += num1;
-    sum2 += num2;
-  }
-
-  if (array.fills[0].commissionAsset == 'BNB') {
-    return sum2;
-  } else if (array.fills[0].commissionAsset == 'BTC') {
-    return sum2;
-  } else {
-    return sum2 - sum1;
-  }
-}
-
 function findAveragePrice(array) {
-  var sum = 0;
-  for(var i = 0; i < array.fills.length; i++) {
-    var x =  Number(array.fills[i].price);
-    sum += x;
+  var sum = {
+      total: 0.0,
+      quantity: 0.0
+  };
+  if(Array.isArray(array.fills)) {
+    for(i in array.fills) {
+        sum.total += Number(array.fills[i].price) * Number(array.fills[i].qty);
+        sum.quantity += Number(array.fills[i].qty);
+    }
   }
-  return (sum / array.fills.length).toFixed(8);
+  sum.average = (sum.total / sum.quantity).toFixed(8);
+  return sum;
 }
 
 function convertToPercentage(initial, next) {
