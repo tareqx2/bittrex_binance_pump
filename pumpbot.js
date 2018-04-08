@@ -22,9 +22,11 @@ var term = require( 'terminal-kit' ).terminal;
 ***********************************/
 var buyOrderPoll;
 var tFill; //global variable for lastPrice taken from binance websocket
-var fixedQty;
+var reqs;
 var realQty;
 var avgPrice;
+var last;
+var coinInput;
 
 /**********************************
 * INITIALIZATION
@@ -48,9 +50,10 @@ function checkLoadingState() {
 }
 
 function waitForInput() {
-  rl.question(`\nInput a coin: `, (answer) =>
+  rl.question('\nInput a coin: ', (answer) =>
   {
     let info = api.getCoinInfo(answer);
+    coinInput = answer.toUpperCase();
     if(info.hasBittrex || info.hasBinance) {
       if(info.hasBittrex && info.hasBinance) {
         if(mainConfig.preferredExchange.toLowerCase() == 'both') {
@@ -75,7 +78,7 @@ function waitForInput() {
         buyBinance(info);
       }
     } else {
-      logger.log('info',`\nCoin was not found on Binance or Bittrex`);
+      logger.log('info','\nCoin was not found on Binance or Bittrex');
       waitForInput();
     }
   });
@@ -86,24 +89,24 @@ function buyBittrex(info) {
   let shares = bittrexConfig.investment / price;
   let coin = 'BTC-'+info.coin.toUpperCase();
 
-  term.brightBlue(`BITTREX: `).defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
+  term.brightBlue('BITTREX: ').defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
   
   api.bittrex.buylimit({market: coin, quantity: shares, rate: price}, (data,err) => {
     if(err) {
-      term.brightBlue(`BITTREX: `).defaultColor(`Purchase was unsuccesful: `).brightRed(`${err.message}\n`);
+      term.brightBlue('BITTREX: ').defaultColor(`Purchase was unsuccesful: `).brightRed(`${err.message}\n`);
     } else {
       buyOrderPoll = setInterval(function() {
         api.bittrex.getorder({uuid: data.result.uuid}, (data,err) => {
           //console.log(data);
           if(err) {
-            term.brightBlue(`BITTREX: `).defaultColor(`Something went wrong with getOrderBuy: ${err.message}\n`);
+            term.brightBlue('BITTREX: ').defaultColor(`Something went wrong with getOrderBuy: ${err.message}\n`);
           } else {
             if(data.result.IsOpen) {
-              term.brightBlue(`BITTREX: `).defaultColor(`Order not yet filled\n`);
+              term.brightBlue('BITTREX: ').defaultColor('Order not yet filled\n');
             } else if(data.result.CancelInitiated) {
-              term.brightBlue(`BITTREX: `).defaultColor(`Order cancel initiated by user\n`);
+              term.brightBlue('BITTREX: ').defaultColor('Order cancel initiated by user\n');
             } else {
-              term.brightBlue(`BITTREX: `).defaultColor(`Successfully bought ${data.result.Quantity} shares of ${info.coin.toUpperCase()+'BTC'} at `).brightGreen(`B${(data.result.PricePerUnit).toFixed(8)}\n\n`);
+              term.brightBlue('BITTREX: ').defaultColor(`Successfully bought ${data.result.Quantity} shares of ${info.coin.toUpperCase()+'BTC'} at `).brightGreen(`B${(data.result.PricePerUnit).toFixed(8)}\n\n`);
               clearInterval(buyOrderPoll);
             }
           }
@@ -119,17 +122,17 @@ function buyBinance(info) {
   let coin = info.coin.toUpperCase()+"BTC";
 
   shares = convertToCorrectLotSize(shares,info.binanceFormatInfo);
-  fixedQty = info.binanceFormatInfo;
+  reqs = info.binanceFormatInfo;
   
   console.log('');
-  term.brightYellow(`BINANCE: `).defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${info.coin.toUpperCase()} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
+  term.brightYellow('BINANCE: ').defaultColor(`Attempting to buy ${shares.toFixed(8)} shares of ${coinInput} at `).brightGreen(`B${price.toFixed(8)}\n\n`);
 
   const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
   api.binance.marketBuy(coin, shares, flags, function(response) {
     if(response.code) {
       console.log("Error Code: " + response.code);
       console.log(response.msg);
-      rl.question(`\nRetry? y/n: `, (answer) => {
+      rl.question('\nRetry? y/n: ', (answer) => {
         if(answer == 'y' || answer == 'Y' ) {
           buyBinance(info);
         }
@@ -148,7 +151,7 @@ function buyBinance(info) {
         console.log('Your order is less than the minimum quantity needed to make a purchase');
       }
   
-      term.brightYellow(`BINANCE: `).defaultColor(`Successfully bought ${realQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
+      term.brightYellow('BINANCE: ').defaultColor(`Successfully bought ${realQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgPrice}\n\n`);
   
       //checkOrderStatus(coin, orderID);
       pollProfitAndLoss(coin, avgPrice);
@@ -156,18 +159,56 @@ function buyBinance(info) {
   });
 }
 
+function sellBinance(asset, quantity) {
+  quantity = convertToCorrectLotSize(quantity,reqs);
+
+  term.brightYellow('BINANCE: ').defaultColor(`Attempting to sell ${quantity.toFixed(8)} shares of ${coinInput} at `).brightGreen(`B${last}\n\n`);
+
+  const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
+  api.binance.marketSell(asset, quantity, flags, function(response) {
+    if(response.code) {
+      console.log("Error Code: " + response.code);
+      console.log(response.msg);
+      rl.question('\nRetry? y/n: ', (answer) => {
+        if(answer == 'y' || answer == 'Y' ) {
+          sellBinance(asset, realQty);
+        }
+        else {
+          exit();
+        }
+      });
+    }
+    else {
+      var x = findAveragePrice(response);
+      var avgSell = x.average;
+      var sellQty = x.quantity;
+      var totalProfit = convertToPercentage(tFill, avgSell);
+  
+      term.brightYellow('BINANCE: ').defaultColor(`Successfully sold ${sellQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
+  
+      if(totalProfit.indexOf("-") > -1) {
+        term('You are now down ').brightRed(`${totalProfit} %`);
+        exit('\n\nYou make some, you lose some');
+      } else {
+        term('You are now up ').brightGreen(` ${totalProfit} %`);
+        exit('\n\nAnother win for TIC');
+      }
+    }
+  });
+}
+
 function pollProfitAndLoss(asset, fillPrice) {
   api.binance.websockets.chart(asset, "1m", (symbol, interval, chart) => {
     let tick = api.binance.last(chart);
-    var last = chart[tick].close;
+    last = chart[tick].close;
     tFill = fillPrice;
 
     avgGain = convertToPercentage(fillPrice, last);
 
     if(avgGain.indexOf("-") > -1) {
-      term(`Last Price: `).brightRed(`${last}\t`).defaultColor(`Gain: `).brightRed(`${avgGain} %\n`);
+      term('Last Price: ').brightRed(`${last}\t`).defaultColor('Gain: ').brightRed(`${avgGain} %\n`);
     } else {
-      term(`Last Price: `).brightGreen(`${last}\t`).defaultColor(`Gain: `).brightGreen(` ${avgGain} %\n`);
+      term('Last Price: ').brightGreen(`${last}\t`).defaultColor('Gain: ').brightGreen(` ${avgGain} %\n`);
     }
   });
 
@@ -180,32 +221,6 @@ function pollProfitAndLoss(asset, fillPrice) {
       inLoop = 0;
       console.log('\nCtrl + S Detected, Selling...\n');
       sellBinance(asset, realQty);
-    }
-  });
-}
-
-function sellBinance(asset, quantity) {
-  quantity = convertToCorrectLotSize(quantity,fixedQty);
-  const flags = {type: 'MARKET', newOrderRespType: 'FULL'};
-  api.binance.marketSell(asset, quantity, flags, function(response) {
-    if(response.code) {
-      console.log("Error Code: " + response.code);
-      console.log(response.msg);
-    }
-
-    var x = findAveragePrice(response);
-    var avgSell = x.average;
-    var sellQty = x.quantity;
-    var totalProfit = convertToPercentage(tFill, avgSell);
-
-    term.brightYellow(`BINANCE: `).defaultColor(`Successfully sold ${sellQty.toFixed(8)} shares of ${response.symbol} at `).brightGreen(`B${avgSell}\n\n`);
-
-    if(totalProfit.indexOf("-") > -1) {
-      term(`You are now down `).brightRed(`${totalProfit} %`);
-      exit('\n\nYou make some, you lose some');
-    } else {
-      term(`You are now up `).brightGreen(` ${totalProfit} %`);
-      exit('\n\nAnother win for TIC');
     }
   });
 }
